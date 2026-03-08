@@ -1,9 +1,21 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Monitor, Globe, Cpu, Wifi, Shield, Terminal } from 'lucide-react';
+import { X, Monitor, Globe, Cpu, Wifi, Shield, Terminal, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
 import { useSelectedHost, useScanStore } from '@/store/scanStore';
 import { Badge, PortStateBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { ScriptRenderer } from '@/components/host/ScriptRenderer';
+import { lookupPortCves, lookupHostCves } from '@/lib/cve-lookup';
+import type { NmapPort, NmapScript } from '@/types/nmap';
+import type { CveEntry } from '@/lib/cve-data';
 import { cn } from '@/lib/cn';
+
+const SEVERITY_BADGE: Record<string, 'red' | 'orange' | 'cyan' | 'muted'> = {
+  critical: 'red',
+  high: 'orange',
+  medium: 'cyan',
+  low: 'muted',
+};
 
 export function HostDetail() {
   const host = useSelectedHost();
@@ -71,44 +83,24 @@ export function HostDetail() {
             <Section icon={<Globe className="w-4 h-4" />} title={`Ports (${host.ports.length})`}>
               <div className="space-y-1.5 max-h-80 overflow-y-auto">
                 {host.ports.map((port) => (
-                  <div
-                    key={`${port.portid}/${port.protocol}`}
-                    className="flex items-center gap-2 text-xs group"
-                  >
-                    <span className="font-mono text-slate-400 w-14 shrink-0">
-                      {port.portid}/{port.protocol}
-                    </span>
-                    <PortStateBadge state={port.state} />
-                    {port.service && (
-                      <span className="text-slate-300 truncate flex-1">
-                        {port.service.name}
-                        {port.service.version && (
-                          <span className="text-slate-500 ml-1">{port.service.version}</span>
-                        )}
-                      </span>
-                    )}
-                  </div>
+                  <PortRow key={`${port.portid}/${port.protocol}`} port={port} />
                 ))}
               </div>
             </Section>
 
-            {/* Scripts */}
+            {/* CVE Findings */}
+            <CveFindingsSection host={host} />
+
+            {/* Host Scripts */}
             {host.scripts && host.scripts.length > 0 && (
               <Section icon={<Terminal className="w-4 h-4" />} title="Host Scripts">
                 {host.scripts.map((script) => (
-                  <div key={script.id} className="mb-3">
-                    <Badge variant="purple" className="mb-1">
-                      {script.id}
-                    </Badge>
-                    <pre className="text-[10px] text-slate-400 font-mono bg-surface p-2 rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
-                      {script.output.trim()}
-                    </pre>
-                  </div>
+                  <ScriptBlock key={script.id} script={script} />
                 ))}
               </Section>
             )}
 
-            {/* Port scripts */}
+            {/* Port Scripts */}
             {host.ports.some((p) => p.scripts && p.scripts.length > 0) && (
               <Section icon={<Shield className="w-4 h-4" />} title="Port Scripts">
                 {host.ports
@@ -116,15 +108,13 @@ export function HostDetail() {
                   .map((port) =>
                     (port.scripts ?? []).map((script) => (
                       <div key={`${port.portid}-${script.id}`} className="mb-3">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1.5">
                           <span className="text-xs text-slate-500 font-mono">
                             {port.portid}/{port.protocol}
                           </span>
                           <Badge variant="cyan">{script.id}</Badge>
                         </div>
-                        <pre className="text-[10px] text-slate-400 font-mono bg-surface p-2 rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
-                          {script.output.trim()}
-                        </pre>
+                        <ScriptRenderer id={script.id} output={script.output} />
                       </div>
                     ))
                   )}
@@ -141,6 +131,121 @@ export function HostDetail() {
         </motion.aside>
       )}
     </AnimatePresence>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Port row with inline CVE badges
+// ──────────────────────────────────────────────────────────────────────────────
+
+function PortRow({ port }: { port: NmapPort }) {
+  const cves = lookupPortCves(port);
+  const hasCves = cves.length > 0;
+  const topSeverity = hasCves ? cves[0].severity : null;
+
+  return (
+    <div className={cn(
+      'flex items-center gap-2 text-xs group rounded px-1 -mx-1',
+      hasCves && 'bg-red-500/5'
+    )}>
+      <span className="font-mono text-slate-400 w-14 shrink-0">
+        {port.portid}/{port.protocol}
+      </span>
+      <PortStateBadge state={port.state} />
+      {port.service && (
+        <span className="text-slate-300 truncate flex-1">
+          {port.service.name}
+          {port.service.version && (
+            <span className="text-slate-500 ml-1">{port.service.version}</span>
+          )}
+        </span>
+      )}
+      {hasCves && topSeverity && (
+        <Badge variant={SEVERITY_BADGE[topSeverity] ?? 'red'} className="shrink-0">
+          <AlertTriangle className="w-2.5 h-2.5 mr-1" />
+          {cves.length}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CVE findings section
+// ──────────────────────────────────────────────────────────────────────────────
+
+function CveFindingsSection({ host }: { host: ReturnType<typeof useSelectedHost> }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!host) return null;
+
+  const findings = lookupHostCves(host);
+  if (findings.length === 0) return null;
+
+  const allCves = findings.flatMap((f) => f.cves.map((cve) => ({ port: f.port, cve })));
+  const criticalCount = allCves.filter((x) => x.cve.severity === 'critical').length;
+
+  return (
+    <Section
+      icon={<AlertTriangle className="w-4 h-4 text-red-400" />}
+      title={`Vulnerability Findings (${allCves.length})`}
+    >
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 mb-2 w-full text-left"
+      >
+        {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        <span>
+          {criticalCount > 0 && <span className="text-red-400 font-semibold">{criticalCount} critical · </span>}
+          {allCves.length} total findings
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="space-y-2.5">
+          {allCves.map(({ port, cve }, i) => (
+            <CveCard key={`${cve.id}-${i}`} port={port} cve={cve} />
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function CveCard({ port, cve }: { port: NmapPort; cve: CveEntry }) {
+  return (
+    <div className="bg-surface rounded-lg p-2.5 border border-surface-border space-y-1.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge variant={SEVERITY_BADGE[cve.severity] ?? 'red'}>{cve.severity.toUpperCase()}</Badge>
+        <span className="font-mono text-xs text-slate-300">{cve.id}</span>
+        <span className="text-[10px] text-slate-500 font-mono ml-auto">
+          port {port.portid}/{port.protocol}
+        </span>
+      </div>
+      <p className="text-[11px] text-slate-400 leading-relaxed">{cve.description}</p>
+      {cve.portHintNote && (
+        <p className="text-[10px] text-orange-400/80 italic">{cve.portHintNote}</p>
+      )}
+      {cve.cvssScore >= 7 && (
+        <div className="text-[10px] font-mono text-slate-500">
+          CVSS: <span className={cve.cvssScore >= 9 ? 'text-red-400' : 'text-orange-400'}>{cve.cvssScore}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Script block with structured rendering
+// ──────────────────────────────────────────────────────────────────────────────
+
+function ScriptBlock({ script }: { script: NmapScript }) {
+  return (
+    <div className="mb-3">
+      <Badge variant="purple" className="mb-1.5">
+        {script.id}
+      </Badge>
+      <ScriptRenderer id={script.id} output={script.output} />
+    </div>
   );
 }
 

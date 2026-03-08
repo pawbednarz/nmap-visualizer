@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { NmapScan, NmapHost, HostFilter } from '@/types/nmap';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -83,71 +84,107 @@ function applyFilter(hosts: NmapHost[], filter: HostFilter): NmapHost[] {
 // Store
 // ──────────────────────────────────────────────────────────────────────────────
 
-export const useScanStore = create<ScanState>((set) => ({
-  scans: [],
-  activeScanIndex: 0,
-  selectedHostId: null,
-  filter: DEFAULT_FILTER,
-  isLoading: false,
-  error: null,
-  filteredHosts: [],
-
-  loadScan: (scan) => {
-    set((state) => {
-      const scans = [...state.scans, scan];
-      const activeScanIndex = scans.length - 1;
-      const filteredHosts = applyFilter(scan.hosts, state.filter);
-      return { scans, activeScanIndex, filteredHosts, error: null };
-    });
-  },
-
-  removeScan: (index) => {
-    set((state) => {
-      const scans = state.scans.filter((_, i) => i !== index);
-      const activeScanIndex = Math.min(state.activeScanIndex, Math.max(0, scans.length - 1));
-      const activeScan = scans[activeScanIndex];
-      const filteredHosts = activeScan ? applyFilter(activeScan.hosts, state.filter) : [];
-      return { scans, activeScanIndex, filteredHosts, selectedHostId: null };
-    });
-  },
-
-  setActiveScan: (index) => {
-    set((state) => {
-      const activeScan = state.scans[index];
-      const filteredHosts = activeScan ? applyFilter(activeScan.hosts, state.filter) : [];
-      return { activeScanIndex: index, filteredHosts, selectedHostId: null };
-    });
-  },
-
-  selectHost: (id) => set({ selectedHostId: id }),
-
-  setFilter: (partial) => {
-    set((state) => {
-      const filter = { ...state.filter, ...partial };
-      const activeScan = state.scans[state.activeScanIndex];
-      const filteredHosts = activeScan ? applyFilter(activeScan.hosts, filter) : [];
-      return { filter, filteredHosts };
-    });
-  },
-
-  clearFilter: () => {
-    set((state) => {
-      const activeScan = state.scans[state.activeScanIndex];
-      const filteredHosts = activeScan ? applyFilter(activeScan.hosts, DEFAULT_FILTER) : [];
-      return { filter: DEFAULT_FILTER, filteredHosts };
-    });
-  },
-
-  clearAll: () =>
-    set({
+export const useScanStore = create<ScanState>()(
+  persist(
+    (set) => ({
       scans: [],
       activeScanIndex: 0,
       selectedHostId: null,
       filter: DEFAULT_FILTER,
-      filteredHosts: [],
+      isLoading: false,
       error: null,
+      filteredHosts: [],
+
+      loadScan: (scan, filename) => {
+        const scanWithMeta = filename ? { ...scan, filename } : scan;
+        set((state) => {
+          const scans = [...state.scans, scanWithMeta];
+          const activeScanIndex = scans.length - 1;
+          const filteredHosts = applyFilter(scanWithMeta.hosts, state.filter);
+          return { scans, activeScanIndex, filteredHosts, error: null };
+        });
+      },
+
+      removeScan: (index) => {
+        set((state) => {
+          const scans = state.scans.filter((_, i) => i !== index);
+          const activeScanIndex = Math.min(state.activeScanIndex, Math.max(0, scans.length - 1));
+          const activeScan = scans[activeScanIndex];
+          const filteredHosts = activeScan ? applyFilter(activeScan.hosts, state.filter) : [];
+          return { scans, activeScanIndex, filteredHosts, selectedHostId: null };
+        });
+      },
+
+      setActiveScan: (index) => {
+        set((state) => {
+          const activeScan = state.scans[index];
+          const filteredHosts = activeScan ? applyFilter(activeScan.hosts, state.filter) : [];
+          return { activeScanIndex: index, filteredHosts, selectedHostId: null };
+        });
+      },
+
+      selectHost: (id) => set({ selectedHostId: id }),
+
+      setFilter: (partial) => {
+        set((state) => {
+          const filter = { ...state.filter, ...partial };
+          const activeScan = state.scans[state.activeScanIndex];
+          const filteredHosts = activeScan ? applyFilter(activeScan.hosts, filter) : [];
+          return { filter, filteredHosts };
+        });
+      },
+
+      clearFilter: () => {
+        set((state) => {
+          const activeScan = state.scans[state.activeScanIndex];
+          const filteredHosts = activeScan ? applyFilter(activeScan.hosts, DEFAULT_FILTER) : [];
+          return { filter: DEFAULT_FILTER, filteredHosts };
+        });
+      },
+
+      clearAll: () =>
+        set({
+          scans: [],
+          activeScanIndex: 0,
+          selectedHostId: null,
+          filter: DEFAULT_FILTER,
+          filteredHosts: [],
+          error: null,
+        }),
     }),
-}));
+    {
+      name: 'nmap-visualizer-scans',
+      storage: createJSONStorage(() => {
+        // Wrap localStorage to catch QuotaExceededError gracefully
+        return {
+          getItem: (key) => {
+            try { return localStorage.getItem(key); } catch { return null; }
+          },
+          setItem: (key, value) => {
+            try { localStorage.setItem(key, value); } catch {
+              console.warn('nmap-visualizer: localStorage quota exceeded — scans will not be persisted.');
+            }
+          },
+          removeItem: (key) => {
+            try { localStorage.removeItem(key); } catch { /* ignore */ }
+          },
+        };
+      }),
+      // Only persist the scan data; transient UI state (filter, selection) resets on reload
+      partialize: (state) => ({
+        scans: state.scans,
+        activeScanIndex: state.activeScanIndex,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Recompute filteredHosts from the rehydrated scan
+          const activeScan = state.scans[state.activeScanIndex];
+          state.filteredHosts = activeScan ? applyFilter(activeScan.hosts, DEFAULT_FILTER) : [];
+        }
+      },
+    }
+  )
+);
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Derived selectors
@@ -164,4 +201,3 @@ export const useSelectedHost = () =>
   });
 
 export const useHasScans = () => useScanStore((state) => state.scans.length > 0);
-

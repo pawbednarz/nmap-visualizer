@@ -7,6 +7,7 @@ import {
   ShieldAlert,
   UploadCloud,
   ArrowRight,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   PieChart,
@@ -25,6 +26,7 @@ import { StatCard, Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { getServiceColor, getOsColor } from '@/lib/colors';
+import { scanCveSummary } from '@/lib/cve-lookup';
 
 const ANIM_CONTAINER: Variants = {
   hidden: { opacity: 0 },
@@ -77,6 +79,7 @@ export function Dashboard() {
   const topServices = scan.serviceDistribution.slice(0, 8);
   const topPorts = scan.portDistribution.slice(0, 10);
   const osData = scan.osDistribution.slice(0, 6);
+  const cveSummary = scanCveSummary(scan.hosts.filter((h) => h.state === 'up'));
 
   return (
     <motion.div
@@ -113,6 +116,50 @@ export function Dashboard() {
           color="text-accent-red"
         />
       </motion.div>
+
+      {/* CVE summary */}
+      {cveSummary.total > 0 && (
+        <motion.div variants={ANIM_ITEM}>
+          <Card className="border-red-500/20 bg-red-500/5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+                <h3 className="text-sm font-semibold text-red-300">Vulnerability Findings</h3>
+              </div>
+              <Badge variant="red">{cveSummary.total} CVEs · {cveSummary.affectedHosts} hosts</Badge>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {cveSummary.critical > 0 && (
+                <div className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                  <span className="text-xs font-mono text-red-300">{cveSummary.critical} critical</span>
+                </div>
+              )}
+              {cveSummary.high > 0 && (
+                <div className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-1.5">
+                  <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
+                  <span className="text-xs font-mono text-orange-300">{cveSummary.high} high</span>
+                </div>
+              )}
+              {cveSummary.medium > 0 && (
+                <div className="flex items-center gap-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-1.5">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
+                  <span className="text-xs font-mono text-yellow-300">{cveSummary.medium} medium</span>
+                </div>
+              )}
+              {cveSummary.low > 0 && (
+                <div className="flex items-center gap-1.5 bg-slate-500/10 border border-slate-500/20 rounded-lg px-3 py-1.5">
+                  <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+                  <span className="text-xs font-mono text-slate-300">{cveSummary.low} low</span>
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2">
+              Open a host in the Host List to view per-port CVE details.
+            </p>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

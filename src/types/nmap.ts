@@ -135,6 +135,7 @@ export interface NmapScan {
   startStr: string;
   version: string;
   xmlOutputVersion: string;
+  filename?: string;        // set at load time from the uploaded file name
 
   // Data
   scanInfo?: NmapScanInfo;

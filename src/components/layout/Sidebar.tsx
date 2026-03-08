@@ -7,9 +7,11 @@ import {
   Globe,
   UploadCloud,
   Scan,
+  X,
+  FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { useHasScans } from '@/store/scanStore';
+import { useHasScans, useScanStore } from '@/store/scanStore';
 
 const NAV_ITEMS = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', requiresScan: false },
@@ -21,6 +23,7 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const hasScans = useHasScans();
+  const { scans, activeScanIndex, setActiveScan, removeScan } = useScanStore();
 
   return (
     <aside className="w-60 shrink-0 flex flex-col bg-surface-elevated border-r border-surface-border">
@@ -36,7 +39,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {NAV_ITEMS.map(({ to, icon: Icon, label, requiresScan }) => (
           <NavLink
             key={to}
@@ -56,10 +59,55 @@ export function Sidebar() {
             <span>{label}</span>
           </NavLink>
         ))}
+
+        {/* Saved scans */}
+        {scans.length > 0 && (
+          <div className="pt-4">
+            <p className="px-3 mb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+              Loaded Scans
+            </p>
+            <div className="space-y-1">
+              {scans.map((scan, i) => {
+                const isActive = i === activeScanIndex;
+                const label = scan.filename
+                  ? scan.filename.replace(/\.xml$/i, '')
+                  : scan.startStr || `Scan ${i + 1}`;
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all duration-150 group cursor-pointer',
+                      isActive
+                        ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-surface-muted border border-transparent'
+                    )}
+                    onClick={() => setActiveScan(i)}
+                  >
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                    <span className="flex-1 truncate font-mono">{label}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeScan(i);
+                      }}
+                      className={cn(
+                        'opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5',
+                        isActive ? 'hover:bg-accent-cyan/20 text-accent-cyan' : 'hover:bg-surface-muted text-slate-500'
+                      )}
+                      title="Remove scan"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Upload shortcut */}
-      <div className="px-3 pb-4">
+      <div className="px-3 pb-4 border-t border-surface-border pt-3">
         <NavLink
           to="/upload"
           className={({ isActive }) =>

@@ -1,0 +1,51 @@
+{
+  "items": [
+    {
+      "id": "item-001",
+      "timestamp": 1705316400000,
+      "request": {
+        "method": "GET",
+        "url": "http://app.example.com/api/users/1",
+        "path": "/api/users/1",
+        "host": "app.example.com",
+        "port": 80,
+        "headers": {
+          "Host": "app.example.com",
+          "User-Agent": "Mozilla/5.0"
+        }
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "Content-Type": "application/json",
+          "Server": "nginx/1.18.0"
+        },
+        "body": "{\"id\": 1, \"email\": \"admin@example.com\", \"role\": \"admin\"}"
+      },
+      "mimeType": "application/json"
+    },
+    {
+      "id": "item-002",
+      "timestamp": 1705316700000,
+      "request": {
+        "method": "POST",
+        "url": "http://app.example.com/login",
+        "path": "/login",
+        "host": "app.example.com",
+        "port": 80,
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "username=admin' OR '1'='1&password=anything"
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"token\": \"eyJhbGciOiJIUzI1NiJ9...\"}"
+      },
+      "mimeType": "application/json"
+    }
+  ]
+}

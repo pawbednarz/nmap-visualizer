@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  viar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: viar:latest
+    container_name: viar-api
+    ports:
+      - "8000:8000"
+    environment:
+      # LLM Provider — set your keys in .env file
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      - LLM_MODEL=${LLM_MODEL:-claude-sonnet-4-6}
+      # Storage
+      - UPLOAD_DIR=/data/uploads
+      - OUTPUT_DIR=/data/reports
+      - FRAMES_DIR=/data/frames
+      - MAX_UPLOAD_SIZE=524288000
+      # Server
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Security
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:5173"]}
+      # JIRA (optional)
+      - JIRA_URL=${JIRA_URL:-}
+      - JIRA_USER=${JIRA_USER:-}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN:-}
+      - JIRA_PROJECT_KEY=${JIRA_PROJECT_KEY:-}
+    volumes:
+      - viar-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  viar-data:
+    driver: local

@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<items burpVersion="2024.1" exportTime="Mon Jan 15 10:00:00 GMT 2024">
+  <item>
+    <time>Mon Jan 15 10:00:00 GMT 2024</time>
+    <url>http://app.example.com/api/users/1</url>
+    <host ip="93.184.216.34">app.example.com</host>
+    <port>80</port>
+    <protocol>http</protocol>
+    <method>GET</method>
+    <path>/api/users/1</path>
+    <request base64="true">R0VUIC9hcGkvdXNlcnMvMSBIVFRQLzEuMQ0KSG9zdDogYXBwLmV4YW1wbGUuY29tDQoNCg==</request>
+    <response base64="true">SFRUUC8xLjEgMjAwIE9LDQpDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24NClNlcnZlcjogbmdpbngvMS4xOC4wDQoNCnsiaWQiOiAxLCAiZW1haWwiOiAiYWRtaW5AZXhhbXBsZS5jb20iLCAicm9sZSI6ICJhZG1pbiJ9</response>
+    <mimetype>JSON</mimetype>
+    <status>200</status>
+  </item>
+  <item>
+    <time>Mon Jan 15 10:05:00 GMT 2024</time>
+    <url>http://app.example.com/login</url>
+    <host>app.example.com</host>
+    <port>80</port>
+    <protocol>http</protocol>
+    <method>POST</method>
+    <path>/login</path>
+    <request base64="true">UE9TVCAvbG9naW4gSFRUUC8xLjENCkhvc3Q6IGFwcC5leGFtcGxlLmNvbQ0KQ29udGVudC1UeXBlOiBhcHBsaWNhdGlvbi94LXd3dy1mb3JtLXVybGVuY29kZWQNCg0KdXNlcm5hbWU9YWRtaW4nIE9SICcxJz0nMSZwYXNzd29yZD1hbnl0aGluZw==</request>
+    <response base64="true">SFRUUC8xLjEgMjAwIE9LDQpDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24NCg0KeyJ0b2tlbiI6ICJleUpoYkdjaU9pSklVekkxTmlKOS4uLiJ9</response>
+    <mimetype>JSON</mimetype>
+    <status>200</status>
+  </item>
+</items>
